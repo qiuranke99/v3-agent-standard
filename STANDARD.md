@@ -1,6 +1,6 @@
 ---
 title: "V3.1 — Layered Agent Engineering Standard"
-version: "1.1"
+version: "1.2"
 status: "stable"
 language: "zh-CN"
 purpose: "用于新项目开发的统一工程标准，整合五层结构、V3流程化与技能集成"
@@ -1330,6 +1330,375 @@ AI agent 的 self-rationalization 不是偶发行为，是系统性模式：
 | "边缘情况不重要" | P4 | Evaluator 在走过场 |
 | "看起来很好" | P4 | 没有运行验证 |
 | "只是一个小改动" | P5 | 可能引入未被测试覆盖的变更 |
+
+## 31. Session Hooks
+
+Agent 进入和退出项目时必须执行标准化动作，不能靠记忆。
+
+### 31.1 Session Start Hook
+
+Agent 开始工作前必须执行：
+
+```
+1. 读取 AGENTS.md — 获取项目导航地图
+2. 读取 README.md + ARCHITECTURE.md — 恢复系统上下文
+3. 检查 tasks/active/ — 识别当前活跃任务
+4. 读取最近的 HANDOFF.md（如有） — 恢复上次执行状态
+5. 识别当前 phase — 确定应激活哪些技能
+6. 加载对应 phase 的技能规则 — progressive disclosure
+7. 输出上下文确认：
+   "已恢复上下文：[项目名] / [当前阶段] / [活跃任务ID]"
+```
+
+### 31.2 Session End Hook
+
+Agent 结束工作前必须执行：
+
+```
+1. 产出或更新 HANDOFF.md — 记录做了什么、剩什么
+2. 更新 task status — todo/in_progress/evaluation 等
+3. 更新相关文档 — 同步代码变更
+4. commit 所有变更 — 不留未保存状态
+5. 输出收尾确认：
+   "Session 结束：[完成项] / [未完成项] / [下一步建议]"
+```
+
+### 31.3 禁止项
+
+- 直接开干不读上下文（= L1 不存在）
+- 做完就走不写 handoff（= 下次 session 上下文丢失）
+- session 结束时有未 commit 的变更
+
+---
+
+## 32. Evaluator Personas
+
+V3.1 的 Evaluator 不是单一角色。根据 phase 和内容类型，Evaluator 可以切换为不同的专项评估 persona。
+
+### 32.1 默认 Personas
+
+#### Persona A — Code Reviewer（代码审查）
+
+适用：P4 阶段，对 builder 交付的代码变更做五维审查。
+
+五维审查轴线：
+
+| 维度 | 核心问题 |
+|------|---------|
+| **Correctness** | 代码做了 spec 说它应该做的事吗？边缘情况处理了吗？ |
+| **Readability** | 另一个 agent 能不借助作者解释就看懂吗？ |
+| **Architecture** | 变更是否遵循现有模式？如果引入新模式，是否有正当理由？ |
+| **Security** | 输入验证了吗？secrets 安全吗？查询参数化了吗？ |
+| **Performance** | 有 N+1 查询吗？有无限制的循环吗？有不必要的同步操作吗？ |
+
+审查输出分级：
+
+| 前缀 | 含义 | 作者必须动作 |
+|------|------|------------|
+| **Critical** | 阻止 merge | 必须修复 |
+| **Important** | 应在 merge 前修 | 需处理 |
+| **Suggestion** | 可选改进 | 可忽略 |
+| **FYI** | 仅供参考 | 无需动作 |
+
+#### Persona B — Test Engineer（测试工程）
+
+适用：P3/P4 阶段，验证测试覆盖率和测试质量。
+
+核心检查项：
+
+- 测试是否存在？
+- 测试是否测行为（而非实现细节）？
+- 边缘情况是否被覆盖？
+- 测试名称是否有描述性？
+- 如果代码变了，这些测试能抓到回归吗？
+
+#### Persona C — Security Auditor（安全审计）
+
+适用：P5 阶段，merge gate 前的安全专项审查。
+
+核心检查项：
+
+- 用户输入是否在系统边界处被验证和清洁？
+- Secrets 是否远离代码、日志和版本控制？
+- 认证/授权是否检查到位？
+- SQL 查询是否参数化？
+- 外部数据源是否被视为不可信？
+- 新增依赖是否有已知漏洞？
+
+### 32.2 Persona 激活规则
+
+- P4 默认激活 Code Reviewer
+- 如果 P3 涉及 API 变更 → 额外激活 Security Auditor
+- 如果 P3 涉及前端变更 → 额外激活 accessibility 检查
+- P5 强制激活 Security Auditor
+- Persona 不互斥，可以叠加
+
+---
+
+## 33. Verification Gates
+
+Exit Criteria 定义 "什么条件才算完成"，Verification Gates 定义 "必须看到什么证据才能进入下一步"。
+
+### 33.1 每个 Phase 的硬证据门控
+
+| Phase | Verification Gate | 必须看到的证据 |
+|-------|------------------|--------------|
+| P0 | Bootstrap Gate | `tree -L 2` 输出匹配标准结构；AGENTS.md 存在且导航正确 |
+| P1 | Contract Gate | TASK_CONTRACT 包含 Goal/Scope/Non-Goals/Acceptance 四项；Acceptance 无模糊词 |
+| P2 | Spec Gate | SPEC.md 有明确 deliverables；Sprint Plan 有 ≥2 个 chunk；每个 chunk 有 acceptance |
+| P3 | Execution Gate | 每个 chunk 有对应测试；`npm test` / `pytest` 绿色输出；HANDOFF.md 完整 |
+| P4 | Evaluation Gate | Evaluator 独立运行了测试（有输出截图/日志）；五维审查有具体发现；verdict 有一级分类 |
+| P5 | Merge Gate | PoW 完整；lint/type/test 全绿；security 检查完成；acceptance checklist 全勾 |
+| P6 | Janitor Gate | 清理变更不引入新 failure；死代码列表已处理；文档同步 |
+
+### 33.2 Gate 规则
+
+- Gate 是二值的：pass 或 fail，没有 "差不多 pass"
+- 不通过 gate 不能进入下一个 phase
+- 每个 gate 的证据必须可机器验证（命令输出）或可人工验证（截图/日志链接）
+- 证据保存在 `evidence/` 目录中
+
+---
+
+## 34. Reference Checklists
+
+以下四份专项清单作为 Evaluator 的参考标准，存储在 `docs/rubrics/` 中。
+
+### 34.1 Testing Patterns Checklist
+
+```md
+## 测试金字塔
+- [ ] Unit tests 覆盖核心业务逻辑
+- [ ] Integration tests 覆盖模块间交互
+- [ ] E2E tests 覆盖关键用户流程
+- [ ] 测试量比例合理（unit >> integration >> e2e）
+
+## 测试质量
+- [ ] 测试名称描述行为而非实现（"should return error when input is empty"）
+- [ ] 每个测试只验证一件事
+- [ ] 测试使用 Arrange-Act-Assert 结构
+- [ ] 边缘情况被覆盖（null, empty, boundary, error path）
+- [ ] 测试不依赖执行顺序
+- [ ] 测试不依赖外部服务（mock/stub 到位）
+- [ ] bug fix 附带了回归测试
+
+## 反模式
+- [ ] 没有只验证实现而非行为的测试
+- [ ] 没有 sleep/timeout 来等待异步操作
+- [ ] 没有一个测试做了太多事情（>20行 arrange）
+- [ ] 没有被注释掉的测试
+```
+
+### 34.2 Security Checklist
+
+```md
+## 输入输出
+- [ ] 所有用户输入在系统边界处验证
+- [ ] 输出正确编码以防 XSS
+- [ ] SQL 查询使用参数化（无字符串拼接）
+- [ ] 文件上传有类型、大小限制
+
+## 认证与授权
+- [ ] 认证逻辑使用成熟库（不自行实现）
+- [ ] 所有受保护路由/端点有 auth 检查
+- [ ] 权限检查在服务端（不依赖前端）
+- [ ] Session/Token 有过期机制
+
+## Secrets
+- [ ] 无硬编码 secrets/密码/API 密钥
+- [ ] .env 在 .gitignore 中
+- [ ] 日志中不输出敏感数据
+- [ ] 错误消息不暴露内部实现细节
+
+## 依赖
+- [ ] 无已知漏洞（npm audit / pip audit）
+- [ ] 依赖来源可信
+- [ ] 依赖版本已锁定
+```
+
+### 34.3 Performance Checklist
+
+```md
+## 数据库
+- [ ] 无 N+1 查询模式
+- [ ] 高频查询有索引
+- [ ] 列表接口有分页
+- [ ] 大批量操作使用批处理
+
+## API
+- [ ] 响应时间有预期基准
+- [ ] 无不必要的同步操作
+- [ ] 大文件使用流式处理
+- [ ] 有适当的缓存策略
+
+## 前端
+- [ ] 无不必要的重渲染
+- [ ] 图片/资源有懒加载
+- [ ] Bundle size 在合理范围
+- [ ] 无阻塞渲染的同步脚本
+```
+
+### 34.4 Accessibility Checklist
+
+```md
+## 基础
+- [ ] 所有图片有 alt 文本
+- [ ] 表单控件有关联的 label
+- [ ] 页面有正确的标题层级（h1 > h2 > h3）
+- [ ] 颜色对比度符合 WCAG AA
+
+## 交互
+- [ ] 键盘可完成所有主要操作
+- [ ] Focus 状态可见
+- [ ] 无时间限制的交互
+- [ ] 错误提示明确且可访问
+
+## 语义
+- [ ] 使用语义化 HTML 元素
+- [ ] ARIA 属性使用正确
+- [ ] 页面 landmark regions 完整
+```
+
+---
+
+## 35. Trigger-based Activation
+
+技能不仅按 phase 触发，还应按内容类型自动激活。
+
+### 35.1 内容触发规则
+
+| 触发条件 | 自动激活的技能 |
+|---------|-------------|
+| 修改 API 端点 / 路由定义 | api-and-interface-design + security-and-hardening |
+| 修改前端组件 / UI 文件 | frontend-ui-engineering + accessibility checklist |
+| 修改数据库 schema / migration | performance checklist + rollback verification |
+| 新增外部依赖 | dependency review + security audit |
+| 修改认证/授权逻辑 | security-and-hardening（强制） |
+| 修改 CI/CD 配置 | ci-cd-and-automation + 不可逆操作检查 |
+| 删除代码 >50 行 | deprecation-and-migration + 依赖影响分析 |
+
+### 35.2 触发优先级
+
+- **Phase 触发**始终生效（基线）
+- **内容触发**是叠加层，不替代 phase 触发
+- 当两者冲突时，取更严格的规则
+
+### 35.3 触发记录
+
+每次内容触发都应记录在 HANDOFF.md 中：
+
+```md
+## Auto-triggered skills
+- security-and-hardening: triggered by auth logic change in src/auth/middleware.ts
+- performance checklist: triggered by DB migration in migrations/003_add_index.sql
+```
+
+---
+
+## 36. Process Steps
+
+每个 phase 不仅要说 "做什么"，还要说 "怎么做" — 具体的分步工作流。
+
+### 36.1 P1 — Task Contract 工作流
+
+```
+Step 1: 理解需求
+  - 读取用户需求描述
+  - 读取相关的 ARCHITECTURE.md 部分
+  - 识别受影响的模块
+
+Step 2: 压缩为 Goal
+  - 一句话描述要达成的结果
+  - 验证：Goal 是否只包含一个动词？
+  - 如果包含多个动词 → 拆为多个 task
+
+Step 3: 划定 Scope 和 Non-Goals
+  - 列出包含的工作
+  - 列出明确排除的工作
+  - 验证：Scope 是否有清晰边界？
+
+Step 4: 定义 Acceptance
+  - 为每个 deliverable 写 checklist 项
+  - 验证：是否全部使用硬标准？（无"合理""适当"等词）
+  - 每个 checklist 项是否可验证？
+
+Step 5: 标注 Risks 和 Rollback
+  - 列出最大的 2-3 个风险
+  - 定义每个风险的回退条件
+
+Step 6: 审查 Contract
+  - 重读一遍，检查是否触发 Anti-Rationalization 表中的借口
+  - 检查是否满足 Contract Gate
+```
+
+### 36.2 P3 — Execution Run 工作流
+
+```
+Step 1: 加载上下文
+  - 读取 TASK_CONTRACT.md
+  - 读取 SPEC.md 和 SPRINT_PLAN.md
+  - 识别当前 chunk
+
+Step 2: Implement（最小完整切片）
+  - 实现当前 chunk 的最小完整功能
+  - 遵循 vertical slice：一次实现一条完整路径
+  - 每次改动不超过 ~100 行就运行测试
+  - 不触碰 scope 外的代码（"顺手改" = 禁止）
+
+Step 3: Test
+  - 为新功能写测试（与实现同步，不是"稍后"）
+  - 运行完整测试套件
+  - 验证构建成功
+
+Step 4: Verify
+  - 确认 slice 可独立工作
+  - 确认已有功能未被破坏
+  - 如有 UI → 截图证据
+  - 如有 API → 请求/响应证据
+
+Step 5: Commit
+  - 描述性 commit message（不用 "fix" "update"）
+  - 代码和文档在同一个 commit
+
+Step 6: 重复 Step 2-5 直到当前 chunk 完成
+
+Step 7: 产出 Handoff
+  - 填写 HANDOFF.md 模板
+  - 列出所有产出的证据
+  - 明确说明未完成项（如果有）
+```
+
+### 36.3 P4 — Evaluation 工作流
+
+```
+Step 1: 独立加载上下文
+  - 读取 TASK_CONTRACT.md（不读 builder 的自述！先建立独立预期）
+  - 读取 SPEC.md
+  - 然后读 HANDOFF.md（与独立预期对比）
+
+Step 2: 审查测试（先看测试）
+  - 测试存在吗？
+  - 测试验证行为还是实现细节？
+  - 边缘情况覆盖了吗？
+  - 测试名称有描述性吗？
+
+Step 3: 独立运行
+  - 运行测试套件（保存输出为证据）
+  - 运行构建（保存输出为证据）
+  - 如有 UI → 自行操作并截图
+  - 如有 API → 自行调用并保存响应
+
+Step 4: 五维审查
+  - Correctness / Readability / Architecture / Security / Performance
+  - 每个发现分级：Critical / Important / Suggestion / FYI
+
+Step 5: 产出评估报告
+  - 明确 verdict：PASS / FAIL / PASS WITH CAVEATS
+  - Critical issues 列表
+  - Important issues 列表
+  - 证据链接
+  - 如果 FAIL → 具体的 rework 建议
+```
 
 ---
 
