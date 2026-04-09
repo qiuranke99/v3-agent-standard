@@ -1,14 +1,15 @@
 ---
 title: "V3.1 — Layered Agent Engineering Standard"
-version: "1.0"
+version: "1.1"
 status: "stable"
 language: "zh-CN"
-purpose: "用于新项目开发的统一工程标准，整合五层结构与V3流程化"
+purpose: "用于新项目开发的统一工程标准，整合五层结构、V3流程化与技能集成"
 design_basis:
   - "OpenAI: Harness engineering / repo as system of record"
   - "Anthropic: planner-generator-evaluator / sprint contract / evaluator"
   - "Cursor: recursive planner-worker / coordination scaling / constraints > instructions"
   - "Symphony: ticket -> workspace -> run -> proof-of-work -> PR"
+  - "agent-skills (Addy Osmani): anti-rationalization / skill-per-phase / red flags / progressive disclosure"
   - "内部V2工作流：phase 0~N / swarm / issue loop / harness"
 owner: "Jackie"
 ---
@@ -94,6 +95,19 @@ Swarm 不是默认开局方式。
 - 单 evaluator
 
 只有当单 agent execution 稳定、assurance 成熟、repo 模块化程度足够高时，才引入 sub-agent swarm。
+
+### 1.6 Agent 会自我欺骗
+
+AI agent 天然倾向于走最短路径，并为跳步行为生成合理化借口。  
+这种 self-rationalization 是系统性风险，不能用软提示对抗，必须用结构性机制对抗：
+
+- **反借口表（Anti-Rationalization Table）**：在关键 phase 列出常见借口和对应的反驳
+- **红旗信号（Red Flags）**：标识 phase 正在偏离的可观测信号
+- **技能绑定（Skill Binding）**：每个 phase 绑定具体的执行技能，不留"自由发挥"空间
+
+这三种机制的目标一致：
+
+> **不信任 agent 的判断。只信任 agent 产出的证据。**
 
 ---
 
@@ -595,6 +609,22 @@ flowchart TD
 - 验收标准是硬标准
 - 风险已标注
 
+### 10.6 Anti-Rationalization — P1
+
+| 借口 | 反驳 |
+|------|------|
+| "需求很清楚，不需要写正式 contract" | 需求越"显然"，越容易在执行中漂移。contract 的价值不是把简单事情复杂化，而是防止隐性 scope 膨胀 |
+| "Non-Goals 不需要写，做的时候自然就知道边界" | Non-Goals 没写 = 边界不存在。Agent 会默认"如果能做就做" |
+| "Acceptance 用自然语言描述就行" | 自然语言验收标准 = 没有标准。必须写成 checklist 或 threshold |
+| "这个任务太小了不值得写 contract" | 小任务不写 contract 是 scope creep 的源头。最小 contract 只需 5 行 |
+
+### 10.7 Red Flags — P1
+
+- ⚠️ Goal 包含两个以上的动词（=多个任务伪装成一个）
+- ⚠️ Scope 和 Non-Goals 没有清晰的分界线
+- ⚠️ Acceptance 中出现"合理""适当""尽量"等模糊词
+- ⚠️ 没有 Rollback Condition
+
 ---
 
 ## 11. Phase P2 — Planning / Spec
@@ -631,6 +661,22 @@ planner 不负责：
 - sprint / chunk 拆分合理
 - 评估标准清楚
 - 风险与回退点已写明
+
+### 11.5 Anti-Rationalization — P2
+
+| 借口 | 反驳 |
+|------|------|
+| "任务够简单，不需要 spec 直接开做" | 如果真的简单，spec 10 分钟就能写完。跳过 spec = 把 planning 成本转嫁给 execution |
+| "Chunk 太细碎了，一口气做完更高效" | 单个大 chunk = 没有中间验证点。失败时无法定位回退点，只能全部重做 |
+| "风险评估是多余的，做着看就行" | "做着看" = 没有回退策略。出问题时 agent 会陷入修复循环而非回退 |
+| "Planner 需要写一些代码来验证 spec 的可行性" | Planner 写代码 = 角色污染。可以写伪代码说明接口，但不应产出实现代码 |
+
+### 11.6 Red Flags — P2
+
+- ⚠️ Spec 中出现具体实现代码（>10 行）
+- ⚠️ Sprint plan 只有一个 chunk（=没有拆）
+- ⚠️ 没有说明 evaluator 如何验证每个 chunk
+- ⚠️ 风险列表为空（没有一个项目是零风险的）
 
 ---
 
@@ -699,6 +745,25 @@ builder 禁止：
 - 文档同步
 - 必要测试已补充
 
+### 12.7 Anti-Rationalization — P3
+
+| 借口 | 反驳 |
+|------|------|
+| "我稍后补测试" | 稍后 = 永远不会。测试和实现必须在同一个 chunk 内交付 |
+| "这个逻辑太简单不需要测试" | "太简单" 是导致回归 bug 的第一原因。越简单的逻辑越容易被后续改动意外破坏 |
+| "Handoff 不需要写，代码就是最好的文档" | 代码说明 what，handoff 说明 why + what remains。没有 handoff = 下一个 agent 无法接续 |
+| "为了效率我把几个 chunk 合在一起做了" | 合并 chunk = 取消了中间验证点。如果合并后的 chunk fail，无法定位是哪部分出了问题 |
+| "这个改动需要稍微扩一下 scope" | "稍微扩 scope" 是 scope creep 的开始。超出 contract 的工作必须先更新 contract |
+| "文档更新可以等功能全部完成后统一做" | 异步更新文档 = 文档永远过期。代码和文档必须在同一个 commit 中同步 |
+
+### 12.8 Red Flags — P3
+
+- ⚠️ 代码变更量 >500 行但没有对应测试
+- ⚠️ Handoff 中 "What remains" 为空但任务明显未完成
+- ⚠️ 连续两个 chunk 的 handoff 内容几乎相同（=没有实质进展）
+- ⚠️ Builder 的 commit message 是 "fix" "update" 等无信息量词
+- ⚠️ Builder 在 handoff 中说"已完成验证"（= 吞掉了 evaluator 职责）
+
 ---
 
 ## 13. Phase P4 — Independent Evaluation
@@ -745,6 +810,22 @@ evaluator 禁止：
 - 失败项可回 builder 重做
 - 通过项有证据支持
 - 不存在模糊的"差不多完成"
+
+### 13.6 Anti-Rationalization — P4
+
+| 借口 | 反驳 |
+|------|------|
+| "Builder 已经跑过测试了，我不需要再跑" | Evaluator 的价值就是独立验证。重复 builder 的结论 = evaluator 不存在 |
+| "核心功能能用就行，边缘情况不重要" | 边缘情况是生产事故的第一来源。evaluator 必须测试 contract 中声明的每个 acceptance 项 |
+| "代码看起来写得很好，通过" | "看起来好" 不是证据。必须有可运行的验证结果 |
+| "只有一个小问题，不值得 fail" | 所有偏离 acceptance 标准的问题都必须记录。可以 pass with caveat，但 caveat 必须写进 PoW |
+
+### 13.7 Red Flags — P4
+
+- ⚠️ Evaluator 的结论只有 pass/fail，没有具体证据
+- ⚠️ Evaluator 使用了 builder handoff 中的相同措辞（= 复制而非独立验证）
+- ⚠️ 所有 acceptance 项全部 pass（概率低，可能是走过场）
+- ⚠️ Evaluator 没有真实运行应用/测试
 
 ---
 
@@ -1185,13 +1266,80 @@ V3.1 相比 V2 的进步在于：
 
 ---
 
-# Part VIII — Final Rule
+# Part IX — Skill Integration
 
-## 28. 最终规则
+## 29. 技能映射
+
+每个 phase 绑定具体的执行技能类别。Agent 进入某个 phase 时，必须激活对应技能，不允许"自由发挥"。
+
+### 29.1 Phase → Skill 映射表
+
+| Phase | 激活技能 | 核心输出 |
+|-------|---------|----------|
+| P0 Bootstrap | context-engineering, documentation | 目录结构 + 模板 + CI 基线 |
+| P1 Task Contract | spec-driven-development, idea-refine | TASK_CONTRACT.md |
+| P2 Planning | planning-and-task-breakdown | SPEC.md + SPRINT_PLAN.md |
+| P3 Execution | incremental-implementation, TDD, source-driven-development | 代码 + 测试 + HANDOFF.md |
+| P4 Evaluation | code-review-and-quality, debugging-and-error-recovery | pass/fail + bug list |
+| P5 Merge Gate | security-and-hardening, performance-optimization | PROOF_OF_WORK.md |
+| P6 Janitor | code-simplification, deprecation-and-migration | 清理报告 |
+| P7 Concurrency | planning-and-task-breakdown (升级版) | 并发评估 |
+
+### 29.2 技能不是可选项
+
+在每个 phase 中，对应技能是**强制执行**的，不是参考建议。  
+"这次跳过 TDD 因为时间紧" 不是合法理由（见各 phase 的 Anti-Rationalization 表）。
+
+### 29.3 渐进式上下文加载
+
+技能文件只在进入对应 phase 时加载，不在 session 开始时全量加载。  
+这遵循 progressive disclosure 原则：
+
+- 减少 token 消耗
+- 聚焦当前 phase 的规则
+- 避免跨 phase 的规则混淆
+
+## 30. Anti-Rationalization 综述
+
+Anti-Rationalization 是 V3.1 的核心对抗机制。
+
+### 30.1 为什么需要反借口表
+
+AI agent 的 self-rationalization 不是偶发行为，是系统性模式：
+
+1. **路径最短化** — agent 倾向于跳过任何不会立即报错的步骤
+2. **自我评估偏差** — agent 倾向于高估自身输出质量
+3. **模糊收敛** — 当任务边界不清时，agent 会默认"差不多就行"
+4. **责任吞噬** — 在 builder/evaluator 未分离时，agent 会自我验证并自我通过
+
+### 30.2 反借口表的使用规则
+
+- 每个关键 phase（P1/P2/P3/P4）都有专属的反借口表
+- 当 agent 产出的推理中出现借口表中列出的模式时，视为 red flag
+- Evaluator 在 P4 阶段有义务检查 builder 是否在 P3 中触发了借口模式
+- 新发现的借口模式应被添加到反借口表中（rule promotion）
+
+### 30.3 典型跨 Phase 借口
+
+| 借口模式 | 出现 Phase | 真实含义 |
+|---------|-----------|----------|
+| "这个太简单了不需要 X" | 任何 | 正在跳步 |
+| "稍后再做 X" | P3 | X 永远不会被做 |
+| "为了效率，我把 X 和 Y 合并了" | P3 | 取消了中间验证点 |
+| "已经验证过了" | P3 | Builder 吞掉了 Evaluator 职责 |
+| "边缘情况不重要" | P4 | Evaluator 在走过场 |
+| "看起来很好" | P4 | 没有运行验证 |
+| "只是一个小改动" | P5 | 可能引入未被测试覆盖的变更 |
+
+---
+
+# Part X — Final Rule
+
+## 31. 最终规则
 
 将 V3.1 压缩成一句话：
 
-> **先建 Context，再跑 Execution；Execution 稳了再谈 Coordination；Control Plane 负责调度；Assurance 永远凌驾于所有层之上。**
+> **先建 Context，再跑 Execution；Execution 稳了再谈 Coordination；Control Plane 负责调度；Assurance 永远凌驾于所有层之上；Agent 的判断不可信，只有证据可信。**
 
 这就是 V3.1 的核心。
 
