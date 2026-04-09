@@ -1,167 +1,224 @@
 # V3.1 — Layered Agent Engineering Standard
 
-A production-ready engineering standard for AI-agent-driven software development. Define layered structure, enforce evidence-based completion, and scale from single-agent execution to coordinated swarms — without losing control.
+**The operating system for AI-driven software development.**
 
-## Why
+V3.1 is not a template. Not a skill. Not a prompt.  
+V3.1 is a **Project Operating System** — complete with protocol, runtime, skills, state machine, and evidence system — that makes AI agents build production-grade software instead of demo-grade prototypes.
 
-Most AI coding setups fail for the same reasons:
+---
 
-- **No separation of concerns.** Planning, building, and evaluation blur together. The agent self-approves and moves on.
-- **No evidence of completion.** "It looks fine" replaces test results, proof-of-work, and acceptance criteria.
-- **Premature parallelism.** Multiple agents start before single-agent execution is stable, creating coordination overhead that exceeds throughput gains.
-- **Knowledge lives in chat.** Architecture decisions, glossaries, and constraints exist only in conversation history — invisible to the next session.
+## Why V3.1?
 
-V3.1 solves these by separating **what the system is made of** (five layers) from **how it runs** (an eight-phase state machine), with assurance cutting across everything.
+| Approach | What happens | Result |
+|----------|-------------|--------|
+| Vibe coding | "Build me a thing" → agent dumps code | Works for demos. Breaks in production. |
+| Chat-driven development | Human micro-manages every step | Doesn't scale. Human becomes bottleneck. |
+| Prompt engineering | Better prompts → slightly better code | Lipstick on a pig. No structural guarantees. |
+| Semi-automated TDD | Agent writes tests → writes code | Better, but no planning, no evaluation, no gates. |
+| **V3.1** | **Agent operates INSIDE a structured runtime** | **Planning → Building → Independent Evaluation → Evidence-gated Merge** |
 
-## How It Works
+The difference: V3.1 agents don't "try to follow rules."  
+They **run inside the rules.** The runtime enforces the state machine. Gates block transitions without evidence. Roles are separated structurally, not by suggestion.
+
+---
+
+## Five-Layer Architecture
 
 ```
-Five-Layer Structure          Eight-Phase State Machine
-─────────────────────         ──────────────────────────
-L1  Context Infrastructure    P0  Repo Bootstrap
-L2  Execution Harness         P1  Task Contract
-L3  Coordination Harness      P2  Planning / Spec
-L4  Control Plane             P3  Execution Run
-L5  Assurance Plane (cross)   P4  Independent Evaluation
-                              P5  Merge / Release Gate
-                              P6  Janitor / Gardener
-                              P7  Concurrency Expansion
+┌─────────────────────────────────────────────────┐
+│  L1  V3.1 STANDARD (Protocol / Constitution)   │  ← Rules
+├─────────────────────────────────────────────────┤
+│  L2  PROJECT TEMPLATE (Repo Skeleton)           │  ← Structure
+├─────────────────────────────────────────────────┤
+│  L3  ORCHESTRATOR (Runtime Kernel)              │  ← Control
+├─────────────────────────────────────────────────┤
+│  L4  PHASE SKILLS (Execution Modules)           │  ← Capability
+├─────────────────────────────────────────────────┤
+│  L5  RUNTIME STATE (Project Instance)           │  ← Data
+└─────────────────────────────────────────────────┘
 ```
 
-```mermaid
-flowchart TD
-    P0[P0 · Repo Bootstrap] --> P1[P1 · Task Contract]
-    P1 --> P2[P2 · Planning / Spec]
-    P2 --> P3[P3 · Execution Run]
-    P3 --> P4[P4 · Independent Evaluation]
-    P4 -->|pass| P5[P5 · Merge / Release Gate]
-    P4 -->|fail| P3
-    P5 --> P6[P6 · Janitor / Gardener]
-    P6 --> P7{P7 · Concurrency?}
-    P7 -->|not needed| DONE[Close]
-    P7 -->|needed + eligible| P1
+### L1 — Standard (Constitution)
+
+The specification. Defines the five-layer system architecture, P0→P7 state machine, role boundaries (Planner / Builder / Evaluator / Janitor), Proof of Work requirements, escalation policy, and concurrency conditions.
+
+**File:** `STANDARD.md`
+
+### L2 — Project Template (Skeleton)
+
+Turns the standard into physical repo structure. Directory layout, document templates (AGENTS.md, TASK_CONTRACT, HANDOFF, PROOF_OF_WORK, SPEC, SPRINT_PLAN), and checklist references.
+
+**Directory:** `templates/`
+
+### L3 — Orchestrator (Kernel)
+
+The most critical layer. Reads project state, determines current phase, loads the right skills, enforces session hooks, manages phase transitions, handles escalation decisions, and controls concurrency policy.
+
+**File:** `skills/v3-orchestrator/SKILL.md`
+
+### L4 — Phase Skills (Execution Modules)
+
+Capability modules dispatched by the orchestrator. Each phase has its own skill with: process steps, verification gates, anti-rationalization tables, red flags, and transition conditions. Skills don't know about each other — the orchestrator manages sequencing.
+
+**Directory:** `skills/`
+
+| Skill | Phase | Core Function |
+|-------|-------|---------------|
+| `v3-bootstrap` | P0 | Repo initialization + CI baseline |
+| `v3-contract` | P1 | Requirement → executable task contract |
+| `v3-planning` | P2 | Contract → spec + sprint plan |
+| `v3-execution` | P3 | Spec → code + tests + handoff |
+| `v3-evaluation` | P4 | Independent verification (five-axis review) |
+| `v3-merge-gate` | P5 | Proof of Work + merge decision |
+| `v3-janitor` | P6 | Dead code cleanup + pattern promotion |
+
+### L5 — Runtime State (Instance Data)
+
+Project-specific state stored in the repo (not in chat context). Tracks current phase, active task, retry count, gate results, and phase history.
+
+**File:** `runtime/state.json`
+
+---
+
+## State Machine
+
+```
+P0 Bootstrap ──gate──→ P1 Contract ──gate──→ P2 Planning ──gate──→ P3 Execution
+                                                                        │
+                                                                   ──gate──→ P4 Evaluation
+                                                                        │
+                                                              pass ←────┤────→ fail (→ P3, retry++)
+                                                                        │
+                                                                        ↓ retry > max
+                                                                    ESCALATE → Human
+                                                                        │
+                                                                   P5 Merge Gate ──gate──→ P6 Janitor ──→ Close / P1
 ```
 
-## Core Principles
+**Gates are structural constraints, not suggestions.** A gate check runs verification scripts. If it fails, the transition is blocked. The agent must fix the issues and re-check.
 
-| # | Principle | Implication |
-|---|-----------|-------------|
-| 1 | **Repo is the single source of truth** | If the agent can't see it in the repo, it doesn't exist |
-| 2 | **Constraints over reminders** | Encode rules in linters, schemas, CI gates — not "please be careful" |
-| 3 | **Completion is defined by evidence** | Tests, PoW, evaluator verdicts — not self-reported status |
-| 4 | **Complexity must be provable** | Every harness component encodes a hypothesis about model limitations |
-| 5 | **Concurrency is not the default** | Start with 1 planner + 1 builder + 1 evaluator. Scale only when stable |
+---
 
 ## Quick Start
 
-### Option A: Bootstrap a new project
+### Install
 
 ```bash
-# Clone the standard
-git clone https://github.com/qiuranke99/v3-agent-standard.git
-
-# Run the bootstrap script to scaffold a new project
-./v3-agent-standard/scripts/bootstrap.sh my-project
-
-# Your project is ready with the full V3.1 directory structure
-cd my-project && tree -L 2
+git clone https://github.com/qiuranke99/v3-agent-standard.git ~/.v3
 ```
 
-### Option B: Use with a coding agent
-
-Point your coding agent (Claude Code, Gemini CLI, Cursor, Codex, etc.) at the standard:
-
-```
-Read STANDARD.md and bootstrap this project according to V3.1.
-```
-
-### Option C: Use the templates directly
-
-Copy files from `templates/` into your project:
+### Initialize a new project
 
 ```bash
-cp templates/AGENTS.md my-project/
-cp templates/WORKFLOW.md my-project/
-cp templates/TASK_CONTRACT.md my-project/tasks/active/
+~/.v3/runtime/v3.sh init my-project
+cd my-project
 ```
 
-## Project Structure
+This creates:
+- Standard directory structure
+- Document templates
+- `runtime/state.json` (starts at P0)
+- Checklists in `docs/rubrics/`
 
-```
-v3-agent-standard/
-├── STANDARD.md              # The complete V3.1 specification (source of truth)
-├── README.md                # This file
-├── LICENSE                  # MIT license
-│
-├── templates/               # Drop-in templates for any project
-│   ├── AGENTS.md            # Agent behavior rules & navigation map
-│   ├── WORKFLOW.md          # State machine, retry policy, run lifecycle
-│   ├── TASK_CONTRACT.md     # Goal, scope, non-goals, acceptance criteria
-│   ├── HANDOFF.md           # What was done, what remains, evidence
-│   ├── PROOF_OF_WORK.md     # Build/test/acceptance evidence for merge
-│   ├── SPEC.md              # Planner output: deliverables, chunks, risks
-│   └── SPRINT_PLAN.md       # Chunk breakdown with ordering & dependencies
-│
-├── scripts/                 # Automation
-│   └── bootstrap.sh         # Scaffold a new V3.1-compliant project
-│
-└── examples/                # Reference implementations
-    └── minimal-project/     # A barebones V3.1-compliant project skeleton
+### Check status
+
+```bash
+~/.v3/runtime/v3.sh status
 ```
 
-## Five-Layer Structure
+### Run gate check
 
-### L1 — Context Infrastructure
-Make all knowledge repo-visible: `AGENTS.md`, `ARCHITECTURE.md`, `GLOSSARY.md`, `docs/specs/`, `docs/contracts/`. A new agent entering the project can recover full context from the repo alone.
+```bash
+~/.v3/runtime/v3.sh gate      # Check if current phase gates pass
+~/.v3/runtime/v3.sh next      # Transition to next phase (requires gate pass)
+```
 
-### L2 — Execution Harness
-Planner → Builder → Evaluator triangle. Task contracts define scope. Sprint plans break work into chunks. Handoffs carry evidence between phases. Builder never self-approves.
+### Capture evidence
 
-### L3 — Coordination Harness
-Only activate when single-agent execution is stable. Isolated workspaces, upward-only handoff, no shared mutable state. Workers don't talk to each other.
+```bash
+~/.v3/runtime/v3.sh evidence test   # Run tests, save output to evidence/
+~/.v3/runtime/v3.sh evidence lint   # Run linter, save output
+~/.v3/runtime/v3.sh evidence build  # Run build, save output
+```
 
-### L4 — Control Plane
-Ticket-driven execution with `WORKFLOW.md` defining the state machine, retry policy, max turns, and merge/close conditions. Runs are versioned and reproducible.
+---
 
-### L5 — Assurance Plane (cross-cutting)
-Evidence system spanning all layers: lint, type checks, tests, proof-of-work, green branch policy, rollback conditions. "Looks fine" is not evidence.
+## Using with AI Agents
 
-## Role Separation
+### With OpenAI Codex
 
-| Role | Does | Does NOT |
-|------|------|----------|
-| **Planner** | Expand spec, split sprints, flag risks | Write implementation code |
-| **Builder** | Implement per contract, update docs, produce handoff | Self-approve, expand scope |
-| **Evaluator** | Independent verification with hard thresholds | Repeat builder's self-report |
-| **Janitor** | Clean dead code, fix AI slop, promote rules | Add new features |
-| **Human** | Define requirements, approve releases, override risk | Micromanage execution |
+Install skills globally:
+```bash
+cp -r ~/.v3/skills/* ~/.codex/skills/
+```
 
-## Escalation Conditions
+Or per-project (done automatically by `v3.sh init`):
+```bash
+cp -r ~/.v3/skills/* .agents/skills/
+```
 
-The agent operates autonomously **unless** one of these conditions triggers:
+### With Claude Code / Anthropic
 
-1. Requirements or scope conflict that cannot be resolved from the contract
-2. Acceptance / release decision that requires human judgment
-3. Spec fundamentally conflicts with architecture
-4. High-risk override, irreversible operation, or boundary-exceeding tradeoff
-5. Evaluator fails repeatedly and root cause is not in implementation layer
+Place skills in `.claude/skills/` or reference in `CLAUDE.md`.
 
-## Design Philosophy
+### With Antigravity / Gemini
 
-This standard synthesizes ideas from:
+Reference in `.agents/workflows/v3.md` or knowledge items.
 
-- **OpenAI** — Harness engineering, repo as system of record
-- **Anthropic** — Planner-generator-evaluator, sprint contracts
-- **Cursor** — Recursive planner-worker, constraints > instructions
-- **Symphony** — Ticket → workspace → run → proof-of-work → PR
-- **Internal V2 workflow** — Phase 0–N, swarm, issue loop, harness iteration
+### With any agent
 
-The key insight: **layers define what the system is made of; the state machine defines how it runs.** This decoupling is what makes V3.1 more stable than frameworks that conflate structure with process.
+The orchestrator skill (`v3-orchestrator/SKILL.md`) is agent-agnostic. Any agent that reads markdown files can operate within V3.1.
 
-## Contributing
+---
 
-Issues and PRs welcome. If you adapt V3.1 for your own workflow, share what worked.
+## Relationship to agent-skills
+
+[agent-skills](https://github.com/addyosmani/agent-skills) by Addy Osmani provides **task-level execution skills** (how to do incremental implementation, how to do code review, etc.).
+
+V3.1 provides **project-level orchestration** (when to plan, when to build, when to evaluate, what evidence is required).
+
+They are complementary:
+
+```
+V3.1 OS (orchestration layer)
+  └── P3 Execution
+        └── agent-skills: incremental-implementation
+        └── agent-skills: test-driven-development
+  └── P4 Evaluation
+        └── agent-skills: code-review-and-quality
+  └── P5 Merge Gate
+        └── agent-skills: security-and-hardening
+```
+
+V3.1 is the **operating system**. agent-skills are **apps** that run inside it.
+
+---
+
+## Anti-Rationalization
+
+V3.1 includes built-in anti-rationalization tables in every phase skill. These counter the systematic pattern of AI agents self-rationalizing to skip steps.
+
+Every phase has:
+- **Anti-Rationalization Table**: common excuses + rebuttals
+- **Red Flags**: observable signals that the phase is going off track
+- **Verification Gate**: hard evidence required before proceeding
+
+> **Core principle: Don't trust the agent's judgment. Only trust the agent's evidence.**
+
+---
+
+## Design Credits
+
+| Source | Contribution |
+|--------|-------------|
+| OpenAI | Harness engineering, repo as system of record |
+| Anthropic | Planner-generator-evaluator, sprint contracts |
+| Cursor | Recursive planner-worker, constraints > instructions |
+| Symphony | Ticket → workspace → run → proof-of-work → PR |
+| agent-skills (Addy Osmani) | Anti-rationalization, progressive disclosure, skill-per-phase |
+
+---
 
 ## License
 
-[MIT](LICENSE)
+MIT
